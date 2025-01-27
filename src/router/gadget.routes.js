@@ -1,7 +1,20 @@
 import { Router } from "express";
-import { getGadgets } from "../controller/gadget.controller.js";
+import {
+  addGadget,
+  deleteGadget,
+  getGadgets,
+  selfDestruct,
+  updateGadget,
+} from "../controller/gadget.controller.js";
 const router = Router();
 
-router.route("/gadgets").get(getGadgets);
+router.route("/gadgets/:id/self-destruct").post(selfDestruct);
+
+router
+  .route("/gadgets")
+  .get(getGadgets)
+  .post(addGadget)
+  .patch(updateGadget)
+  .delete(deleteGadget);
 
 export default router;

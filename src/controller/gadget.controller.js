@@ -30,11 +30,24 @@ function generateRandomName() {
   return `${article} ${adjective} ${noun}`;
 }
 
-// 1) Retrieve a list of all gadgets
+// 1) Retrieve a list of all gadgets or gadgets with a specific status
 const getGadgets = async (req, res) => {
   const prisma = new PrismaClient();
   try {
-    let gadgets = await prisma.gadget.findMany();
+    const { status } = req.query;
+    if (status) {
+      const validStatuses = [
+        "Available",
+        "Deployed",
+        "Destroyed",
+        "Decommissioned",
+      ];
+      if (!validStatuses.includes(status))
+        throw new Error("Invalid status value");
+    }
+    let gadgets = await prisma.gadget.findMany({
+      where: status ? { status } : {},
+    });
     if (!gadgets) throw new Error("Gadgets not found");
 
     gadgets = gadgets.map((gadget) => {
@@ -67,7 +80,7 @@ const addGadget = async (req, res) => {
       gadget,
     });
   } catch (error) {
-    res.status(500).josn({ message: error.message });
+    res.status(500).json({ message: error.message });
   } finally {
     await prisma.$disconnect();
   }
@@ -78,8 +91,10 @@ const updateGadget = async (req, res) => {
   const prisma = new PrismaClient();
   try {
     const body = req.body;
+    if (!body || !body.id) throw new Error("Gadget ID is required");
+
     const updatedGadget = await prisma.gadget.update({
-      where: { id: req.params.id },
+      where: { id: body.id },
       data: { name: body.name, status: body.status },
     });
     if (!updatedGadget) throw new Error("Unable to update the gadget");
@@ -88,7 +103,7 @@ const updateGadget = async (req, res) => {
       updatedGadget,
     });
   } catch (error) {
-    res.status(500).josn({ message: error.message });
+    res.status(500).json({ message: error.message });
   } finally {
     await prisma.$disconnect();
   }
@@ -99,7 +114,7 @@ const deleteGadget = async (req, res) => {
   const prisma = new PrismaClient();
   try {
     const gadget = await prisma.gadget.delete({
-      where: { id: req.params.id },
+      where: { id: req.body.id },
     });
     if (!gadget) throw new Error("Unable to delete the gadget");
     res.json({
@@ -107,9 +122,44 @@ const deleteGadget = async (req, res) => {
       gadget,
     });
   } catch (error) {
-    res.status(500).josn({ message: error.message });
+    res.status(500).json({ message: error.message });
   } finally {
     await prisma.$disconnect();
   }
 };
-export { getGadgets, addGadget, updateGadget, deleteGadget };
+
+// 5) Trigger the self-destruct sequence for a specific gadge
+function generateConfirmationCode() {
+  const characters =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let confirmationCode = "";
+  for (let i = 0; i < 8; i++) {
+    const randomIndex = Math.floor(Math.random() * characters.length);
+    confirmationCode += characters[randomIndex];
+  }
+  return confirmationCode;
+}
+
+const selfDestruct = async (req, res) => {
+  const prisma = new PrismaClient();
+  const id = req.params.id;
+  if (!id) throw new Error("Gadget ID is required");
+  try {
+    const updatedGadget = await prisma.gadget.update({
+      where: { id },
+      data: { status: "Destroyed" },
+    });
+    if (!updatedGadget) throw new Error("Unable to self-destruct gadget");
+    res.json({
+      message: "Self-destruct completed successfully",
+      ConfirmatonCode: generateConfirmationCode(),
+      updatedGadget,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  } finally {
+    await prisma.$disconnect();
+  }
+};
+
+export { getGadgets, addGadget, updateGadget, deleteGadget, selfDestruct };
